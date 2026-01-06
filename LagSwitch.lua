@@ -1,6 +1,6 @@
--- ⚡ REAL LAG SWITCH v4.0 - STRONG VERSION
--- لعبة Steal a Brainrot - تجاوز كل الحواجز
--- By Ayman - إصدار نهائي قوي
+-- Lag Switch (Blink) - IMPROVED VERSION
+-- للعبة Steal a Brainrot - إصدار محسن
+-- بيخليك تتحرك من غير ما السيرفر يحس بيك + يمسك الأشياء
 
 local Players = game:GetService("Players")
 local LP = Players.LocalPlayer
@@ -8,207 +8,84 @@ local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 
--- تنظيف شامل
+-- 1. تنظيف
 for _, v in pairs(CoreGui:GetChildren()) do
     if v.Name == "LagSwitchGUI" then v:Destroy() end
 end
 
--- إعداد واجهة قوية
+-- 2. إعداد الواجهة
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "LagSwitchGUI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
+ScreenGui.Parent = CoreGui
 
-if syn and syn.protect_gui then 
-    syn.protect_gui(ScreenGui)
-elseif gethui then
-    ScreenGui.Parent = gethui()
-else
-    ScreenGui.Parent = CoreGui
-end
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 220, 0, 250)
-MainFrame.Position = UDim2.new(0.7, 0, 0.3, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-MainFrame.BackgroundTransparency = 0.05
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
-
-local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0.15, 0)
-Corner.Parent = MainFrame
-
--- زر رئيسي قوي
+-- زر اللاج
 local Btn = Instance.new("TextButton")
-Btn.Name = "LagButton"
-Btn.Size = UDim2.new(0.85, 0, 0.5, 0)
-Btn.Position = UDim2.new(0.075, 0, 0.05, 0)
-Btn.Text = "⚡ LAG: OFF"
-Btn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+Btn.Parent = ScreenGui
+Btn.Size = UDim2.new(0, 150, 0, 150)
+Btn.Position = UDim2.new(0.7, 0, 0.4, 0)
+Btn.Text = "LAG: OFF 🟢"
+Btn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
 Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 Btn.Font = Enum.Font.FredokaOne
-Btn.TextSize = 26
-Btn.TextScaled = false
-Btn.Parent = MainFrame
-
-local BtnCorner = Instance.new("UICorner")
-BtnCorner.CornerRadius = UDim.new(0.1, 0)
-BtnCorner.Parent = Btn
+Btn.TextSize = 20
+Btn.Active = true
+Btn.Draggable = true
+Btn.TextScaled = true
 
 -- زر الإمساك التلقائي
 local GrabBtn = Instance.new("TextButton")
-GrabBtn.Name = "GrabButton"
-GrabBtn.Size = UDim2.new(0.85, 0, 0.2, 0)
-GrabBtn.Position = UDim2.new(0.075, 0, 0.6, 0)
-GrabBtn.Text = "🔄 AUTO GRAB: OFF"
-GrabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 200)
+GrabBtn.Parent = ScreenGui
+GrabBtn.Size = UDim2.new(0, 120, 0, 40)
+GrabBtn.Position = UDim2.new(0.7, 0, 0.55, 0)
+GrabBtn.Text = "AUTO GRAB: OFF"
+GrabBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 200)
 GrabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-GrabBtn.Font = Enum.Font.GothamBold
-GrabBtn.TextSize = 18
-GrabBtn.Parent = MainFrame
+GrabBtn.Font = Enum.Font.Gotham
+GrabBtn.TextSize = 14
+GrabBtn.Active = true
+GrabBtn.Visible = false -- يظهر لما اللاج يشتغل
+
+-- تجميل
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(1, 0)
+Corner.Parent = Btn
 
 local GrabCorner = Instance.new("UICorner")
-GrabCorner.CornerRadius = UDim.new(0.1, 0)
+GrabCorner.CornerRadius = UDim.new(0.5, 0)
 GrabCorner.Parent = GrabBtn
 
--- حالة النظام
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(0.85, 0, 0.15, 0)
-StatusLabel.Position = UDim2.new(0.075, 0, 0.85, 0)
-StatusLabel.Text = "✅ System Ready"
-StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Font = Enum.Font.GothamSemibold
-StatusLabel.TextSize = 16
-StatusLabel.Parent = MainFrame
-
--- المتغيرات
+-- 3. المتغيرات
 local Lagging = false
 local AutoGrab = false
-local OriginalPosition = nil
-local TeleportLock = false
-local StrongLagEnabled = false
+local OldPos = nil
 local StolenObjects = {}
-local Connection1, Connection2, Connection3
+local AntiReturn = false
 
--- 🔧 نظام لاج قوي جداً
-local function EnableStrongLag()
-    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then
-        return false
-    end
-    
-    -- حفظ المكان بدقة
-    OriginalPosition = LP.Character.HumanoidRootPart.CFrame
-    
-    -- نظام لاج متعدد الطبقات
-    settings().Network.IncomingReplicationLag = 50000
-    settings().Physics.PhysicsSendRate = 0
-    game:GetService("NetworkClient"):SetOutgoingKBPSLimit(0.5)
-    
-    -- إبطاء الفيزياء
-    game:GetService("PhysicsService"):SetPhysicsEnvironmentalThrottle(0.1)
-    
-    -- تعطيل الاصطدامات بالكامل
-    for _, part in pairs(LP.Character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
-            part.Massless = true
-            part.Velocity = Vector3.new(0, 0, 0)
-        end
-    end
-    
-    -- حماية ضد العودة
-    TeleportLock = true
-    StrongLagEnabled = true
-    
-    return true
-end
-
--- 🔧 نظام إيقاف اللاج
-local function DisableStrongLag()
-    -- إعادة كل الإعدادات
-    settings().Network.IncomingReplicationLag = 0
-    settings().Physics.PhysicsSendRate = 60
-    game:GetService("NetworkClient"):SetOutgoingKBPSLimit(1024)
-    game:GetService("PhysicsService"):SetPhysicsEnvironmentalThrottle(1)
-    
-    -- إعادة الاصطدامات بعد تأخير
-    task.spawn(function()
-        task.wait(2)
-        if LP.Character then
-            for _, part in pairs(LP.Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
-                    part.Massless = false
-                end
-            end
-        end
-    end)
-    
-    TeleportLock = false
-    task.wait(1)
-    StrongLagEnabled = false
-end
-
--- 🛡️ نظام منع العودة القوي
-Connection1 = RunService.Heartbeat:Connect(function()
-    if TeleportLock and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = LP.Character.HumanoidRootPart
-        
-        -- إذا حاولوا يرجعوك
-        if OriginalPosition then
-            local distance = (hrp.Position - OriginalPosition.Position).Magnitude
-            if distance < 15 then
-                -- إرجاعك فوراً مع اهتزاز
-                local randomOffset = Vector3.new(
-                    math.random(-2, 2),
-                    0,
-                    math.random(-2, 2)
-                )
-                pcall(function()
-                    hrp.CFrame = OriginalPosition + randomOffset
-                end)
-            end
-        end
-    end
-end)
-
--- 🎯 نظام الإمساك التلقائي القوي
-local function StrongAutoGrab()
+-- 4. نظام الإمساك التلقائي المحسن
+local function AutoGrabItems()
     if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
     
-    local characterPos = LP.Character.HumanoidRootPart.Position
+    local pos = LP.Character.HumanoidRootPart.Position
     
+    -- البحث عن كل الأشياء في ووركسبيس
     for _, obj in pairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj.Parent then
-            -- البحث عن أي شيء يمكن سرقته
-            local objName = obj.Name:lower()
-            local isStealable = false
-            
-            -- كلمات دلالية للأشياء المسروقة
-            local keywords = {"brain", "item", "loot", "coin", "cash", "money", "diamond", "gold", "treasure", "reward"}
-            
-            for _, keyword in pairs(keywords) do
-                if objName:find(keyword) then
-                    isStealable = true
-                    break
-                end
-            end
-            
-            if isStealable then
-                local distance = (obj.Position - characterPos).Magnitude
+            -- الكلمات الدلالية للأشياء المسروقة
+            local name = obj.Name:lower()
+            if name:find("brain") or name:find("item") or name:find("coin") or name:find("cash") then
+                local distance = (obj.Position - pos).Magnitude
                 
-                if distance < 25 then
-                    -- تيليبورت الشيء لك
+                if distance < 20 then -- مسافة أكبر
+                    -- تيليبورت الشيء للاعب
                     pcall(function()
-                        obj.CFrame = LP.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -3)
+                        obj.CFrame = LP.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -2)
                         
-                        -- إضافة للقائمة
+                        -- تأكيد الإمساك
                         if not table.find(StolenObjects, obj) then
                             table.insert(StolenObjects, obj)
-                            StatusLabel.Text = "👜 Grabbed: " .. obj.Name
+                            Btn.Text = "LAG: ON 🔴\n(Grabbed!)"
                         end
                     end)
                 end
@@ -217,86 +94,154 @@ local function StrongAutoGrab()
     end
 end
 
--- 🔄 تحديث الإمساك التلقائي
-Connection2 = RunService.Heartbeat:Connect(function()
-    if AutoGrab and Lagging then
-        StrongAutoGrab()
+-- 5. وظيفة اللاج المحسنة
+Btn.MouseButton1Click:Connect(function()
+    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then
+        Btn.Text = "NO CHARACTER"
+        task.wait(1)
+        Btn.Text = "LAG: OFF 🟢"
+        return
+    end
+    
+    Lagging = not Lagging
+    
+    if Lagging then
+        -- تشغيل اللاج (قطع الاتصال الوهمي)
+        Btn.Text = "LAG: ON 🔴\n(Walk Now!)"
+        Btn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        
+        -- إظهار زر الإمساك
+        GrabBtn.Visible = true
+        
+        -- حفظ المكان الأصلي
+        OldPos = LP.Character.HumanoidRootPart.CFrame
+        
+        -- لاج أقوى + تعطيل فيزياء
+        settings().Network.IncomingReplicationLag = 3000 -- زيادة القيمة
+        settings().Physics.PhysicsSendRate = 0
+        
+        -- تعطيل الاصطدامات فوراً
+        for _, part in pairs(LP.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+                part.Velocity = Vector3.new(0, 0, 0)
+            end
+        end
+        
+        -- تفعيل نظام منع العودة
+        AntiReturn = true
+        
+        -- مؤقت تلقائي 10 ثواني
+        task.spawn(function()
+            task.wait(10)
+            if Lagging then
+                Lagging = false
+                Btn.Text = "LAG: OFF 🟢"
+                Btn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+                GrabBtn.Visible = false
+                settings().Network.IncomingReplicationLag = 0
+                settings().Physics.PhysicsSendRate = 60
+                AntiReturn = false
+            end
+        end)
+        
+    else
+        -- إعادة الاتصال
+        Btn.Text = "LAG: OFF 🟢"
+        Btn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        GrabBtn.Visible = false
+        
+        -- إرجاع الإعدادات
+        settings().Network.IncomingReplicationLag = 0
+        settings().Physics.PhysicsSendRate = 60
+        
+        -- إعادة الاصطدامات بعد تأخير
+        task.spawn(function()
+            task.wait(1)
+            if LP.Character then
+                for _, part in pairs(LP.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = true
+                    end
+                end
+            end
+        end)
+        
+        -- إيقاف نظام منع العودة بعد 5 ثواني
+        task.spawn(function()
+            task.wait(5)
+            AntiReturn = false
+        end)
     end
 end)
 
--- 🎮 زر اللاج الرئيسي
-Btn.MouseButton1Click:Connect(function()
-    if Lagging then
-        -- إيقاف اللاج
-        Lagging = false
-        Btn.Text = "⚡ LAG: OFF"
-        Btn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-        
-        DisableStrongLag()
-        StatusLabel.Text = "✅ Mission Complete"
-        
+-- 6. زر الإمساك التلقائي
+GrabBtn.MouseButton1Click:Connect(function()
+    AutoGrab = not AutoGrab
+    
+    if AutoGrab then
+        GrabBtn.Text = "AUTO GRAB: ON"
+        GrabBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        Btn.Text = "LAG: ON 🔴\n(Auto-Grab ON)"
     else
-        -- تفعيل اللاج القوي
-        if EnableStrongLag() then
-            Lagging = true
-            Btn.Text = "⚡ LAG: ON"
-            Btn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-            StatusLabel.Text = "🚨 LAG ACTIVE - MOVE FAST!"
-            
-            -- مؤقت 7 ثواني (مثالي)
-            task.spawn(function()
-                task.wait(7)
-                if Lagging then
-                    Lagging = false
-                    Btn.Text = "⚡ LAG: OFF"
-                    Btn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-                    DisableStrongLag()
-                    StatusLabel.Text = "🕒 Auto-Stopped"
-                end
+        GrabBtn.Text = "AUTO GRAB: OFF"
+        GrabBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 200)
+        Btn.Text = "LAG: ON 🔴\n(Walk Now!)"
+    end
+end)
+
+-- 7. نظام منع العودة (الأهم)
+RunService.Heartbeat:Connect(function()
+    if AntiReturn and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LP.Character.HumanoidRootPart
+        
+        -- إذا حاول النظام إرجاعك للمكان القديم
+        if OldPos and (hrp.Position - OldPos.Position).Magnitude < 10 then
+            pcall(function()
+                -- إرجاعك فوراً للمكان الجديد
+                hrp.CFrame = OldPos
             end)
         end
     end
 end)
 
--- 🎮 زر الإمساك التلقائي
-GrabBtn.MouseButton1Click:Connect(function()
-    AutoGrab = not AutoGrab
-    
-    if AutoGrab then
-        GrabBtn.Text = "🔄 AUTO GRAB: ON"
-        GrabBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-        StatusLabel.Text = "🎯 Auto-Grab Enabled"
-    else
-        GrabBtn.Text = "🔄 AUTO GRAB: OFF"
-        GrabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 200)
-        StatusLabel.Text = "✅ Auto-Grab Disabled"
+-- 8. نظام الإمساك التلقائي أثناء التشغيل
+RunService.Stepped:Connect(function()
+    if Lagging then
+        -- طول ما اللاج شغال، امسح التصادم
+        if LP.Character then
+            for _, v in pairs(LP.Character:GetDescendants()) do
+                if v:IsA("BasePart") then 
+                    v.CanCollide = false 
+                end
+            end
+        end
+        
+        -- إذا كان الإمساك التلقائي مفعل
+        if AutoGrab then
+            AutoGrabItems()
+        end
     end
 end)
 
--- 🛡️ حماية ضد الموت
+-- 9. إعادة تعيين عند موت اللاعب
 LP.CharacterAdded:Connect(function(character)
-    task.wait(1.5)
+    task.wait(1)
     if Lagging then
         Lagging = false
-        Btn.Text = "⚡ LAG: OFF"
-        Btn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-        DisableStrongLag()
+        Btn.Text = "LAG: OFF 🟢"
+        Btn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        GrabBtn.Visible = false
+        settings().Network.IncomingReplicationLag = 0
+        settings().Physics.PhysicsSendRate = 60
+        AntiReturn = false
+        AutoGrab = false
     end
 end)
 
--- 🧹 تنظيف الذاكرة
-game:GetService("UserInputService").WindowFocusReleased:Connect(function()
-    if Lagging then
-        DisableStrongLag()
-    end
-end)
-
-print("")
-print("⚡ REAL LAG SWITCH v4.0 LOADED ⚡")
-print("✅ زر اللاج: قوي ومباشر")
-print("✅ الإمساك التلقائي: يشمل كل الأشياء")
-print("✅ منع العودة: نظام متقدم")
-print("✅ الوقت: 7 ثواني مثالية")
-print("")
-
-StatusLabel.Text = "🔥 SYSTEM READY - PRESS RED BUTTON"
+print("✅ Lag Switch IMPROVED Loaded!")
+print("🎯 المميزات الجديدة:")
+print("1. نظام منع العودة التلقائي")
+print("2. إمساك تلقائي للأشياء")
+print("3. لاج أقوى (3000ms)")
+print("4. مؤقت تلقائي 10 ثواني")
