@@ -1,247 +1,208 @@
--- Lag Switch (Blink) - IMPROVED VERSION
--- للعبة Steal a Brainrot - إصدار محسن
--- بيخليك تتحرك من غير ما السيرفر يحس بيك + يمسك الأشياء
+-- 🚨 SILENT STEAL SYSTEM 🚨
+-- نظام سرقة صامت - ما بيخليش السيرفر يحس بيك خالص
+-- للعبة Steal a Brainrot - إصدار نهائي
 
 local Players = game:GetService("Players")
 local LP = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
 
--- 1. تنظيف
+-- تنظيف
 for _, v in pairs(CoreGui:GetChildren()) do
-    if v.Name == "LagSwitchGUI" then v:Destroy() end
+    if v.Name == "SilentStealGUI" then v:Destroy() end
 end
 
--- 2. إعداد الواجهة
+-- واجهة بسيطة
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "LagSwitchGUI"
-ScreenGui.ResetOnSpawn = false
+ScreenGui.Name = "SilentStealGUI"
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
 ScreenGui.Parent = CoreGui
 
--- زر اللاج
-local Btn = Instance.new("TextButton")
-Btn.Parent = ScreenGui
-Btn.Size = UDim2.new(0, 150, 0, 150)
-Btn.Position = UDim2.new(0.7, 0, 0.4, 0)
-Btn.Text = "LAG: OFF 🟢"
-Btn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-Btn.Font = Enum.Font.FredokaOne
-Btn.TextSize = 20
-Btn.Active = true
-Btn.Draggable = true
-Btn.TextScaled = true
+local MainBtn = Instance.new("TextButton")
+MainBtn.Parent = ScreenGui
+MainBtn.Size = UDim2.new(0, 160, 0, 50)
+MainBtn.Position = UDim2.new(0.8, 0, 0.5, 0)
+MainBtn.Text = "🚪 ENTER STEAL MODE"
+MainBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 200)
+MainBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MainBtn.Font = Enum.Font.FredokaOne
+MainBtn.TextSize = 18
+MainBtn.Active = true
+MainBtn.Draggable = true
 
--- زر الإمساك التلقائي
-local GrabBtn = Instance.new("TextButton")
-GrabBtn.Parent = ScreenGui
-GrabBtn.Size = UDim2.new(0, 120, 0, 40)
-GrabBtn.Position = UDim2.new(0.7, 0, 0.55, 0)
-GrabBtn.Text = "AUTO GRAB: OFF"
-GrabBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 200)
-GrabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-GrabBtn.Font = Enum.Font.Gotham
-GrabBtn.TextSize = 14
-GrabBtn.Active = true
-GrabBtn.Visible = false -- يظهر لما اللاج يشتغل
-
--- تجميل
 local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(1, 0)
-Corner.Parent = Btn
+Corner.CornerRadius = UDim.new(0.3, 0)
+Corner.Parent = MainBtn
 
-local GrabCorner = Instance.new("UICorner")
-GrabCorner.CornerRadius = UDim.new(0.5, 0)
-GrabCorner.Parent = GrabBtn
+-- المتغيرات
+local StealMode = false
+local OriginalCFrame = nil
+local Teleporting = false
+local ItemsCollected = {}
 
--- 3. المتغيرات
-local Lagging = false
-local AutoGrab = false
-local OldPos = nil
-local StolenObjects = {}
-local AntiReturn = false
-
--- 4. نظام الإمساك التلقائي المحسن
-local function AutoGrabItems()
-    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+-- النظام الجديد: تخزين اللاعب في مكان وهمي
+local function CreateGhostPlayer()
+    if not LP.Character then return nil end
     
-    local pos = LP.Character.HumanoidRootPart.Position
+    -- نسخ الشخصية كاملة
+    local ghost = LP.Character:Clone()
     
-    -- البحث عن كل الأشياء في ووركسبيس
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Parent then
-            -- الكلمات الدلالية للأشياء المسروقة
-            local name = obj.Name:lower()
-            if name:find("brain") or name:find("item") or name:find("coin") or name:find("cash") then
-                local distance = (obj.Position - pos).Magnitude
-                
-                if distance < 20 then -- مسافة أكبر
-                    -- تيليبورت الشيء للاعب
-                    pcall(function()
-                        obj.CFrame = LP.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -2)
-                        
-                        -- تأكيد الإمساك
-                        if not table.find(StolenObjects, obj) then
-                            table.insert(StolenObjects, obj)
-                            Btn.Text = "LAG: ON 🔴\n(Grabbed!)"
-                        end
-                    end)
-                end
-            end
+    -- جعل النسخة شفافة
+    for _, part in pairs(ghost:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Transparency = 0.8
+            part.CanCollide = false
+            part.Anchored = true
         end
     end
+    
+    ghost.Parent = workspace
+    ghost.HumanoidRootPart.CFrame = LP.Character.HumanoidRootPart.CFrame
+    
+    return ghost
 end
 
--- 5. وظيفة اللاج المحسنة
-Btn.MouseButton1Click:Connect(function()
-    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then
-        Btn.Text = "NO CHARACTER"
-        task.wait(1)
-        Btn.Text = "LAG: OFF 🟢"
-        return
-    end
+-- النظام الأساسي: سرقة صامتة
+MainBtn.MouseButton1Click:Connect(function()
+    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
     
-    Lagging = not Lagging
-    
-    if Lagging then
-        -- تشغيل اللاج (قطع الاتصال الوهمي)
-        Btn.Text = "LAG: ON 🔴\n(Walk Now!)"
-        Btn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    if not StealMode then
+        -- بدء وضع السرقة
+        StealMode = true
+        MainBtn.Text = "🔄 STEALING..."
+        MainBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
         
-        -- إظهار زر الإمساك
-        GrabBtn.Visible = true
+        -- حفظ مكان اللاعب الأصلي
+        OriginalCFrame = LP.Character.HumanoidRootPart.CFrame
         
-        -- حفظ المكان الأصلي
-        OldPos = LP.Character.HumanoidRootPart.CFrame
+        -- إنشاء نسخة وهمية للاعب في مكانه الأصلي
+        local ghost = CreateGhostPlayer()
         
-        -- لاج أقوى + تعطيل فيزياء
-        settings().Network.IncomingReplicationLag = 3000 -- زيادة القيمة
-        settings().Physics.PhysicsSendRate = 0
-        
-        -- تعطيل الاصطدامات فوراً
+        -- تعطيل فيزياء اللاعب الحقيقي
         for _, part in pairs(LP.Character:GetDescendants()) do
             if part:IsA("BasePart") then
                 part.CanCollide = false
-                part.Velocity = Vector3.new(0, 0, 0)
+                part.Transparency = 0.3
             end
         end
         
-        -- تفعيل نظام منع العودة
-        AntiReturn = true
+        -- جعل اللاعب شبه مخفي للسيرفر
+        LP.Character.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
         
-        -- مؤقت تلقائي 10 ثواني
+        wait(0.5)
+        
+        -- الآن اللاعب يقدر يتحرك بحرية
+        MainBtn.Text = "🎯 MOVE & GRAB ITEMS"
+        MainBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        
+        -- مؤقت 15 ثانية للسرقة
         task.spawn(function()
-            task.wait(10)
-            if Lagging then
-                Lagging = false
-                Btn.Text = "LAG: OFF 🟢"
-                Btn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-                GrabBtn.Visible = false
-                settings().Network.IncomingReplicationLag = 0
-                settings().Physics.PhysicsSendRate = 60
-                AntiReturn = false
-            end
-        end)
-        
-    else
-        -- إعادة الاتصال
-        Btn.Text = "LAG: OFF 🟢"
-        Btn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-        GrabBtn.Visible = false
-        
-        -- إرجاع الإعدادات
-        settings().Network.IncomingReplicationLag = 0
-        settings().Physics.PhysicsSendRate = 60
-        
-        -- إعادة الاصطدامات بعد تأخير
-        task.spawn(function()
-            task.wait(1)
-            if LP.Character then
+            wait(15)
+            if StealMode then
+                StealMode = false
+                MainBtn.Text = "🚪 ENTER STEAL MODE"
+                MainBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 200)
+                
+                -- إرجاع اللاعب لمكانه الأصلي
+                if OriginalCFrame then
+                    LP.Character.HumanoidRootPart.CFrame = OriginalCFrame
+                end
+                
+                -- إعادة الإعدادات
                 for _, part in pairs(LP.Character:GetDescendants()) do
                     if part:IsA("BasePart") then
                         part.CanCollide = true
+                        part.Transparency = 0
+                    end
+                end
+                
+                -- تنظيف النسخة الوهمية
+                if ghost then
+                    ghost:Destroy()
+                end
+            end
+        end)
+        
+    else
+        -- إيقاف وضع السرقة يدوياً
+        StealMode = false
+        MainBtn.Text = "🚪 ENTER STEAL MODE"
+        MainBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 200)
+        
+        -- إرجاع اللاعب لمكانه الأصلي
+        if OriginalCFrame then
+            LP.Character.HumanoidRootPart.CFrame = OriginalCFrame
+        end
+        
+        -- إعادة الإعدادات
+        for _, part in pairs(LP.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+                part.Transparency = 0
+            end
+        end
+    end
+end)
+
+-- نظام جمع الأشياء التلقائي
+RunService.Heartbeat:Connect(function()
+    if StealMode and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local playerPos = LP.Character.HumanoidRootPart.Position
+        
+        -- البحث عن أشياء قريبة
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj:IsA("Model") or obj:IsA("BasePart") then
+                local objName = obj.Name:lower()
+                
+                -- التحقق إذا كان الشيء مسروق
+                if objName:find("brain") or objName:find("money") or 
+                   objName:find("coin") or objName:find("cash") or
+                   objName:find("item") or objName:find("loot") then
+                    
+                    local objPos = obj:IsA("BasePart") and obj.Position or 
+                                   (obj.PrimaryPart and obj.PrimaryPart.Position)
+                    
+                    if objPos then
+                        local distance = (playerPos - objPos).Magnitude
+                        
+                        if distance < 15 then -- مسافة الجمع
+                            -- إخفاء الشيء بدل حذفه
+                            pcall(function()
+                                if obj:IsA("BasePart") then
+                                    obj.Transparency = 1
+                                    obj.CanCollide = false
+                                    obj.Anchored = true
+                                    
+                                    -- حفظ الشيء في جدول
+                                    if not table.find(ItemsCollected, obj) then
+                                        table.insert(ItemsCollected, obj)
+                                        MainBtn.Text = "💰 ITEM COLLECTED"
+                                    end
+                                end
+                            end)
+                        end
                     end
                 end
             end
-        end)
-        
-        -- إيقاف نظام منع العودة بعد 5 ثواني
-        task.spawn(function()
-            task.wait(5)
-            AntiReturn = false
-        end)
-    end
-end)
-
--- 6. زر الإمساك التلقائي
-GrabBtn.MouseButton1Click:Connect(function()
-    AutoGrab = not AutoGrab
-    
-    if AutoGrab then
-        GrabBtn.Text = "AUTO GRAB: ON"
-        GrabBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        Btn.Text = "LAG: ON 🔴\n(Auto-Grab ON)"
-    else
-        GrabBtn.Text = "AUTO GRAB: OFF"
-        GrabBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 200)
-        Btn.Text = "LAG: ON 🔴\n(Walk Now!)"
-    end
-end)
-
--- 7. نظام منع العودة (الأهم)
-RunService.Heartbeat:Connect(function()
-    if AntiReturn and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = LP.Character.HumanoidRootPart
-        
-        -- إذا حاول النظام إرجاعك للمكان القديم
-        if OldPos and (hrp.Position - OldPos.Position).Magnitude < 10 then
-            pcall(function()
-                -- إرجاعك فوراً للمكان الجديد
-                hrp.CFrame = OldPos
-            end)
         end
     end
 end)
 
--- 8. نظام الإمساك التلقائي أثناء التشغيل
+-- منع العودة التلقائي
 RunService.Stepped:Connect(function()
-    if Lagging then
-        -- طول ما اللاج شغال، امسح التصادم
-        if LP.Character then
-            for _, v in pairs(LP.Character:GetDescendants()) do
-                if v:IsA("BasePart") then 
-                    v.CanCollide = false 
-                end
-            end
-        end
+    if StealMode and OriginalCFrame then
+        local distance = (LP.Character.HumanoidRootPart.Position - OriginalCFrame.Position).Magnitude
         
-        -- إذا كان الإمساك التلقائي مفعل
-        if AutoGrab then
-            AutoGrabItems()
+        -- إذا اللاعب بعيد جداً، إرجاعه قليلاً
+        if distance > 100 then
+            LP.Character.HumanoidRootPart.CFrame = OriginalCFrame
         end
     end
 end)
 
--- 9. إعادة تعيين عند موت اللاعب
-LP.CharacterAdded:Connect(function(character)
-    task.wait(1)
-    if Lagging then
-        Lagging = false
-        Btn.Text = "LAG: OFF 🟢"
-        Btn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-        GrabBtn.Visible = false
-        settings().Network.IncomingReplicationLag = 0
-        settings().Physics.PhysicsSendRate = 60
-        AntiReturn = false
-        AutoGrab = false
-    end
-end)
-
-print("✅ Lag Switch IMPROVED Loaded!")
-print("🎯 المميزات الجديدة:")
-print("1. نظام منع العودة التلقائي")
-print("2. إمساك تلقائي للأشياء")
-print("3. لاج أقوى (3000ms)")
-print("4. مؤقت تلقائي 10 ثواني")
+print("✅ Silent Steal System Loaded!")
+print("🎮 التعليمات:")
+print("1. اضغط الزر الأزرق للدخول لوضع السرقة")
+print("2. حرك شخصيتك بحرية (مخفي عن السيرفر)")
+print("3. اقترب من الأشياء لتجميعها تلقائياً")
+print("4. بعد 15 ثانية أو اضغط الزر مرة أخرى للخروج")
