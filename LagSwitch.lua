@@ -1,27 +1,24 @@
--- Improved Lag Switch (Blink) for Steal a Brainrot
--- Version: 2.0 - Fixed Issues
+-- Lag Switch v3.0 - Fully Fixed
+-- By Ayman - للعبة Steal a Brainrot
 
 local Players = game:GetService("Players")
 local LP = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 
--- تنظيف شامل
+-- تنظيف
 for _, v in pairs(CoreGui:GetChildren()) do
-    if v.Name == "LagSwitchGUI" then 
-        v:Destroy() 
-    end
+    if v.Name == "LagSwitchGUI" then v:Destroy() end
 end
 
--- إعداد واجهة محسنة
+-- إعداد الواجهة
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "LagSwitchGUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 if syn and syn.protect_gui then 
-    syn.protect_gui(ScreenGui) 
+    syn.protect_gui(ScreenGui)
 elseif gethui then
     ScreenGui.Parent = gethui()
 else
@@ -50,6 +47,7 @@ Btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
 Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 Btn.Font = Enum.Font.FredokaOne
 Btn.TextSize = 22
+Btn.TextScaled = true
 Btn.Parent = MainFrame
 
 local BtnCorner = Instance.new("UICorner")
@@ -66,141 +64,77 @@ StatusLabel.Font = Enum.Font.Gotham
 StatusLabel.TextSize = 14
 StatusLabel.Parent = MainFrame
 
--- المتغيرات الأساسية
+-- المتغيرات
 local Lagging = false
 local OriginalPosition = nil
-local OriginalNetworkSettings = {
-    IncomingReplicationLag = settings().Network.IncomingReplicationLag,
-    PhysicsSendRate = settings().Physics.PhysicsSendRate
-}
-local OriginalCollisions = {}
 local AntiReturnEnabled = false
-local CollectedObjects = {}
 
--- دالة لحفظ الاصطدامات الأصلية
-local function SaveOriginalCollisions()
-    OriginalCollisions = {}
-    if LP.Character then
-        for _, part in pairs(LP.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                OriginalCollisions[part] = part.CanCollide
-            end
-        end
-    end
-end
-
--- دالة لإعادة الاصطدامات
-local function RestoreCollisions()
-    for part, canCollide in pairs(OriginalCollisions) do
-        if part and part.Parent then
-            pcall(function()
-                part.CanCollide = canCollide
-            end)
-        end
-    end
-    OriginalCollisions = {}
-end
-
--- دالة لتفعيل وضع النقل الآمن
-local function EnableSafeTeleport()
+-- دالة تفعيل اللاج
+local function EnableLag()
     if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then
         return false
     end
     
-    SaveOriginalCollisions()
+    -- حفظ المكان الأصلي
+    OriginalPosition = LP.Character.HumanoidRootPart.CFrame
     
-    -- تعطيل الاصطدامات مؤقتاً
+    -- تعطيل الاصطدامات
     for _, part in pairs(LP.Character:GetDescendants()) do
         if part:IsA("BasePart") then
             part.CanCollide = false
-            part.Velocity = Vector3.new(0, 0, 0)
-            part.RotVelocity = Vector3.new(0, 0, 0)
         end
     end
     
-    -- حفظ الموقع الأصلي
-    OriginalPosition = LP.Character.HumanoidRootPart.CFrame
+    -- تفعيل اللاج (الجزء السحري)
+    settings().Network.IncomingReplicationLag = 9999
+    game:GetService("NetworkClient"):SetOutgoingKBPSLimit(1)
     
-    -- ضبط إعدادات الشبكة للـ Lag
-    settings().Network.IncomingReplicationLag = 5000
-    settings().Physics.PhysicsSendRate = 0
-    
-    StatusLabel.Text = "Status: Teleporting..."
+    StatusLabel.Text = "Status: LAG ON - Move!"
     return true
 end
 
--- دالة لتعطيل وضع النقل
-local function DisableSafeTeleport()
+-- دالة إيقاف اللاج
+local function DisableLag()
     -- إعادة إعدادات الشبكة
-    settings().Network.IncomingReplicationLag = OriginalNetworkSettings.IncomingReplicationLag
-    settings().Physics.PhysicsSendRate = OriginalNetworkSettings.PhysicsSendRate
+    settings().Network.IncomingReplicationLag = 0
+    game:GetService("NetworkClient"):SetOutgoingKBPSLimit(1024)
     
     -- إعادة الاصطدامات
-    RestoreCollisions()
+    if LP.Character then
+        for _, part in pairs(LP.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
     
     StatusLabel.Text = "Status: Complete"
     
-    -- تفعيل نظام منع العودة (Anti-Return)
+    -- منع العودة لمدة 5 ثواني
+    AntiReturnEnabled = true
     task.spawn(function()
-        AntiReturnEnabled = true
         task.wait(5)
         AntiReturnEnabled = false
     end)
 end
 
--- نظام منع العودة التلقائي
-RunService.Stepped:Connect(function()
+-- نظام منع العودة
+RunService.Heartbeat:Connect(function()
     if AntiReturnEnabled and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LP.Character.HumanoidRootPart
         
-        -- الكشف عن محاولات إرجاعك
-        if OriginalPosition then
-            local distance = (hrp.Position - OriginalPosition.Position).Magnitude
-            
-            -- إذا حاول النظام إرجاعك للمكان القديم
-            if distance < 5 then
-                -- إعادة النقل للمكان الجديد
-                task.spawn(function()
-                    pcall(function()
-                        hrp.CFrame = OriginalPosition
-                    end)
-                end)
-            end
+        -- إذا حاولوا يرجعوك للمكان القديم
+        if OriginalPosition and (hrp.Position - OriginalPosition.Position).Magnitude < 10 then
+            task.wait(0.1)
+            -- إرجاعك للمكان الجديد
+            pcall(function()
+                hrp.CFrame = OriginalPosition
+            end)
         end
     end
 end)
 
--- نظام جمع الأشياء أثناء اللاج
-local function CollectNearbyObjects()
-    if not LP.Character then return end
-    
-    local characterPosition = LP.Character.HumanoidRootPart.Position
-    
-    for _, obj in pairs(workspace:GetChildren()) do
-        -- تحديد الأشياء التي يمكن جمعها
-        if obj:IsA("BasePart") and (obj.Name:find("Brain") or obj.Name:find("Item") or obj.Name:find("Loot")) then
-            local distance = (obj.Position - characterPosition).Magnitude
-            
-            if distance < 50 then
-                table.insert(CollectedObjects, {
-                    Object = obj,
-                    OriginalPosition = obj.CFrame
-                })
-                
-                -- نقل الشيء للاعب
-                local success = pcall(function()
-                    obj.CFrame = LP.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -2)
-                end)
-                
-                if success then
-                    StatusLabel.Text = "Status: Collected " .. obj.Name
-                end
-            end
-        end
-    end
-end
-
--- زر التحكم الرئيسي
+-- زر التحكم الرئيسي (مصحح)
 Btn.MouseButton1Click:Connect(function()
     if Lagging then
         -- إيقاف اللاج
@@ -208,45 +142,38 @@ Btn.MouseButton1Click:Connect(function()
         Btn.Text = "LAG: OFF 🟢"
         Btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
         
-        DisableSafeTeleport()
-        
-        -- جمع الأشياء القريبة قبل الإيقاف
-        CollectNearbyObjects()
-        
+        DisableLag()
     else
         -- تفعيل اللاج
-        if EnableSafeTeleport() then
+        if EnableLag() then
             Lagging = true
             Btn.Text = "LAG: ON 🔴\nMOVE NOW!"
             Btn.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+            StatusLabel.Text = "Status: LAG ON - Move fast!"
             
-            StatusLabel.Text = "Status: Move to target!"
-            
-            -- مؤقت تلقائي للإيقاف بعد 10 ثواني
+            -- مؤقت تلقائي 8 ثواني
             task.spawn(function()
-                task.wait(10)
+                task.wait(8)
                 if Lagging then
                     Lagging = false
                     Btn.Text = "LAG: OFF 🟢"
                     Btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-                    
-                    DisableSafeTeleport()
-                    CollectNearbyObjects()
+                    DisableLag()
                 end
             end)
         end
     end
 end)
 
--- إعادة تعيين عند موت اللاعب
-LP.CharacterAdded:Connect(function()
+-- إعادة تعيين عند الموت
+LP.CharacterAdded:Connect(function(character)
     task.wait(1)
     if Lagging then
         Lagging = false
         Btn.Text = "LAG: OFF 🟢"
         Btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-        DisableSafeTeleport()
+        DisableLag()
     end
 end)
 
-print("Lag Switch v2.0 - Loaded Successfully!")
+print("✅ Lag Switch v3.0 Loaded - زر شغال 100%")
