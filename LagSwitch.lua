@@ -1,74 +1,113 @@
--- UNLOCK BASE (Chilli Logic)
--- بيفتح كل القواعد والمخازن المقفولة
+--[[ 
+    REPORT-BASED SCRIPT: STEAL A BRAINROT
+    Target: Bypass Server Sanity Checks & Collision
+    Logic: Based on User Provided Technical Report (Section 5.2)
+]]
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
-local Window = Library:MakeWindow({Name = "🔓 UNLOCKER", HidePremium = false, SaveConfig = false, ConfigFolder = "UnlockConfig"})
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local LP = Players.LocalPlayer
 
-local Tab = Window:MakeTab({Name = "Base & Tycoon", Icon = "rbxassetid://4483345998", PremiumOnly = false})
+-- إعدادات الواجهة
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 200, 0, 130)
+MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
 
--- 1. الزرار اللي أنت عاوزه (Unlock Base)
-Tab:AddButton({
-	Name = "🔓 UNLOCK ALL BASES (Delete Doors)",
-	Callback = function()
-        local Count = 0
-        -- البحث عن كل الأبواب والحواجز في الماب
-        for _, object in pairs(workspace:GetDescendants()) do
-            -- قائمة الأسماء اللي السكربت بيدور عليها عشان يمسحها
-            local names = {
-                "Door", "Gate", "Laser", "Barrier", "OwnerDoor", 
-                "Security", "Glass", "Wall", "Entrance"
-            }
-            
-            for _, name in pairs(names) do
-                -- لو لقينا جزء اسمه زي الأسماء دي
-                if string.find(object.Name, name) or object.Name == name then
-                    -- نتأكد إنه مش الأرضية ولا اللاعبين
-                    if object:IsA("BasePart") and not object.Parent:FindFirstChild("Humanoid") then
-                        object:Destroy() -- امسحه فوراً
-                        Count = Count + 1
-                    end
-                end
+-- العنوان
+local Title = Instance.new("TextLabel")
+Title.Text = "🛡️ BRAINROT BYPASS"
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+Title.TextColor3 = Color3.white
+Title.Parent = MainFrame
+
+-- 1. زرار النوكليب (حسب التقرير: RunService.Stepped)
+local NoclipBtn = Instance.new("TextButton")
+NoclipBtn.Size = UDim2.new(1, 0, 0, 45)
+NoclipBtn.Position = UDim2.new(0, 0, 0, 35)
+NoclipBtn.Text = "👻 NOCLIP (V2)"
+NoclipBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+NoclipBtn.TextColor3 = Color3.white
+NoclipBtn.Parent = MainFrame
+
+local noclipActive = false
+NoclipBtn.MouseButton1Click:Connect(function()
+    noclipActive = not noclipActive
+    if noclipActive then
+        NoclipBtn.Text = "👻 NOCLIP: ON"
+        NoclipBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+    else
+        NoclipBtn.Text = "👻 NOCLIP: OFF"
+        NoclipBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    end
+end)
+
+-- تنفيذ النوكليب في كل فريم (لتجاوز فحص السيرفر)
+RunService.Stepped:Connect(function()
+    if noclipActive and LP.Character then
+        for _, part in pairs(LP.Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide == true then
+                part.CanCollide = false
             end
         end
+    end
+end)
+
+-- 2. زرار السرقة التلقائية (Auto Interact)
+local StealBtn = Instance.new("TextButton")
+StealBtn.Size = UDim2.new(1, 0, 0, 45)
+StealBtn.Position = UDim2.new(0, 0, 0, 85)
+StealBtn.Text = "🖐️ AUTO STEAL (Nearby)"
+StealBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+StealBtn.TextColor3 = Color3.white
+StealBtn.Parent = MainFrame
+
+local stealActive = false
+StealBtn.MouseButton1Click:Connect(function()
+    stealActive = not stealActive
+    if stealActive then
+        StealBtn.Text = "🖐️ STEALING..."
+        StealBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
         
-        Library:MakeNotification({
-            Name = "Success!", 
-            Content = "Unlocked " .. Count .. " doors/walls. Enter now!", 
-            Time = 4
-        })
-  	end
-})
-
--- 2. زرار إضافي: سرقة القاعدة (Claim Tycoon)
-Tab:AddButton({
-	Name = "🏠 Auto Claim Free Tycoon",
-	Callback = function()
-        for _, v in pairs(workspace:GetDescendants()) do
-            -- البحث عن زرار البداية (Begin / Claim)
-            if v.Name == "TouchInterest" and v.Parent then
-                if string.find(string.lower(v.Parent.Name), "claim") or string.find(string.lower(v.Parent.Name), "begin") or string.find(string.lower(v.Parent.Name), "owner") then
-                    firetouchinterest(game.Players.LocalPlayer.Character.HumanoidRootPart, v.Parent, 0)
-                    firetouchinterest(game.Players.LocalPlayer.Character.HumanoidRootPart, v.Parent, 1)
-                end
+        -- لوب السرقة
+        task.spawn(function()
+            while stealActive do
+                task.wait(0.1) -- سرعة معقولة عشان الكيك
+                pcall(function()
+                    if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+                        local MyPos = LP.Character.HumanoidRootPart.Position
+                        
+                        -- التفاعل مع الأزرار (E)
+                        for _, v in pairs(Workspace:GetDescendants()) do
+                            if v:IsA("ProximityPrompt") then
+                                if (v.Parent.Position - MyPos).Magnitude < 15 then
+                                    fireproximityprompt(v)
+                                end
+                            end
+                        end
+                        
+                        -- التفاعل مع اللمس (Touch)
+                        for _, v in pairs(Workspace:GetDescendants()) do
+                            if v:IsA("TouchTransmitter") and v.Parent then
+                                if (v.Parent.Position - MyPos).Magnitude < 10 then
+                                    firetouchinterest(LP.Character.HumanoidRootPart, v.Parent, 0)
+                                    firetouchinterest(LP.Character.HumanoidRootPart, v.Parent, 1)
+                                end
+                            end
+                        end
+                    end
+                end)
             end
-        end
-  	end
-})
-
--- 3. زرار الطوارئ (Noclip) لو الباب متمسحش
-Tab:AddToggle({
-	Name = "👻 Noclip (Walk Through)",
-	Default = false,
-	Callback = function(Value)
-        getgenv().Noclip = Value
-        game:GetService("RunService").Stepped:Connect(function()
-            if getgenv().Noclip and game.Players.LocalPlayer.Character then
-                for _, v in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
-                    if v:IsA("BasePart") then v.CanCollide = false end
-                end
-            end
+            StealBtn.Text = "🖐️ AUTO STEAL (Nearby)"
+            StealBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
         end)
-	end
-})
-
-Library:Init()
+    end
+end)
